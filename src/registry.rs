@@ -4,7 +4,7 @@ use std::error::Error;
 use url::Url;
 
 pub struct DockerRegistry {
-    url: Url,
+    pub url: Url,
     client: Client,
 }
 
