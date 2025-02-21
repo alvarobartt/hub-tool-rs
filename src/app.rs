@@ -24,21 +24,27 @@ struct Containers {
 
 struct Container {
     url: String,
+    tags: Vec<String>,
     info: Option<serde_json::Value>,
 }
 
 impl App {
     pub async fn new(registry: DockerRegistry) -> Self {
-        let items = registry
-            .list_repositories()
-            .await
-            .unwrap_or(vec![])
-            .iter()
-            .map(|url| Container {
-                url: url.to_string(),
+        let repositories = registry.list_repositories().await.unwrap_or(vec![]);
+
+        let mut items = Vec::new();
+        for repository in repositories {
+            let tags = registry
+                .list_tags(&repository)
+                .await
+                .unwrap_or_else(|_| vec!["latest".to_string()]);
+
+            items.push(Container {
+                url: repository.to_string(),
+                tags,
                 info: None,
-            })
-            .collect();
+            });
+        }
 
         let mut list_state = ListState::default();
         list_state.select(Some(0));
@@ -137,7 +143,6 @@ impl StatefulWidget for &mut App {
                 .split(area)
         } else {
             Layout::default()
-                // .direction(Direction::Vertical)
                 .constraints([Constraint::Min(3)])
                 .split(area)
         };
@@ -146,7 +151,14 @@ impl StatefulWidget for &mut App {
             .containers
             .items
             .iter()
-            .map(|i| ListItem::new(i.url.as_str()))
+            .map(|container| {
+                let tags_span = Span::styled(
+                    format!(" [{}]", container.tags.join(", ")),
+                    Style::default().fg(Color::Rgb(255, 153, 0)), // Orange color
+                );
+                let line = Line::from(vec![Span::raw(&container.url), tags_span]);
+                ListItem::new(line)
+            })
             .collect();
 
         let list = List::new(items)
