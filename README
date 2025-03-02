@@ -1,0 +1,2 @@
+`whale` is a Rust SDK for the Docker Hub API v2; and `whale-tui` is TUI built with
+`ratatui` leveraging the `whale` SDK.
