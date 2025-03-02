@@ -3,6 +3,7 @@ members = [
     "whale",
     "whale-tui",
 ]
+resolver = "3"
 
 [workspace.package]
 version = "0.1.0"
