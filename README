@@ -1,2 +1,18 @@
 `whale` is a Rust SDK for the Docker Hub API v2; and `whale-tui` is TUI built with
 `ratatui` leveraging the `whale` SDK.
+
+┌─ Repositories ────────────┐┌─ Repository Details ────────────┐
+│   ollama/ollama           ││ Name: ollama/quantize           │
+│ > ollama/quantize         ││ Tags: latest, gguf              │
+│                           ││ Size: 4.2GB                     │
+│                           ││ Last Updated: 2025-02-28        │
+│                           ││                                 │
+│                           ││ Description:                    │
+│                           ││ ...                             │
+│                           ││                                 │
+│                           ││ Pull Command:                   │
+│                           ││ docker pull ollama/quantize     │
+└───────────────────────────┘└─────────────────────────────────┘
+┌─ Actions ──────────────────────────────────────────────────────┐
+│ [↑/↓] Navigate   [Enter] Select   [P] Pull   [Q] Quit          │
+└────────────────────────────────────────────────────────────────┘
