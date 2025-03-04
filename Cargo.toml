@@ -1,8 +1,5 @@
 [workspace]
-members = [
-    "whale",
-    "whale-tui",
-]
+members = ["whale"]
 resolver = "3"
 
 [workspace.package]
