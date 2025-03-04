@@ -53,7 +53,7 @@ impl DockerHubClient {
     /// which should have read access to the Docker Hub, to be able to call the rest of the
     /// methods within this struct. This method will configure and setup the HTTP client that
     /// will be used within the rest of the methods to send requests to the Docker Hub.
-    pub fn new(token: &str) -> anyhow::Result<Self, anyhow::Error> {
+    pub fn new(token: &str) -> anyhow::Result<Self> {
         let url = Url::parse("https://hub.docker.com").context("couldn't parse docker hub url")?;
 
         let mut headers = header::HeaderMap::new();
@@ -78,10 +78,7 @@ impl DockerHubClient {
     /// Note that if the repository is private but the provided token has access to it,
     /// then the repositories will be listed, otherwise only the public ones (if any)
     /// will be listed.
-    pub async fn list_repositories(
-        &self,
-        org: &str,
-    ) -> anyhow::Result<Vec<Repository>, anyhow::Error> {
+    pub async fn list_repositories(&self, org: &str) -> anyhow::Result<Vec<Repository>> {
         let url = self
             .url
             .join(&format!("v2/repositories/{}", org))
@@ -103,11 +100,7 @@ impl DockerHubClient {
     /// This method expects both the organization or username via the `org`
     /// argument plus the `repository` name for the repository that the tags
     /// will be listed for.
-    pub async fn list_tags(
-        &self,
-        org: &str,
-        repository: &str,
-    ) -> anyhow::Result<Vec<Tag>, anyhow::Error> {
+    pub async fn list_tags(&self, org: &str, repository: &str) -> anyhow::Result<Vec<Tag>> {
         let url = self
             .url
             .join(&format!("v2/repositories/{}/{}/tags", org, repository))
@@ -130,7 +123,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_list_repositories() -> anyhow::Result<(), anyhow::Error> {
+    async fn test_list_repositories() -> anyhow::Result<()> {
         let pat =
             std::env::var("DOCKER_PAT").context("environment variable `DOCKER_PAT` is not set")?;
         let dh =
