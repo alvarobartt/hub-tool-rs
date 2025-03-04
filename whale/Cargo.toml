@@ -2,7 +2,7 @@
 name = "whale"
 version = "0.0.1"
 edition = "2024"
-readme = "README.md"
+readme = "../README.md"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/alvarobartt/whale"
 authors = ["Alvaro Bartolome <alvarobartt@gmail.com>"]
