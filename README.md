@@ -3,7 +3,7 @@
 At the moment only listing the repositories and the tags for a given org or username
 is supported, the API may be unstable and subject to breaking changes.
 
-Requirements, `cargo add whale` and a Docker Hub Personal Access Token (PAT) to
+Requirements are only `cargo add whale` and a Docker Hub Personal Access Token (PAT) to
 be generated from https://app.docker.com/settings/personal-access-tokens.
 
 ```rust
