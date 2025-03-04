@@ -3,9 +3,9 @@ members = ["whale"]
 resolver = "3"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
-readme = "README"
+readme = "README.md"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/alvarobartt/whale"
 authors = ["Alvaro Bartolome <alvarobartt@gmail.com>"]
