@@ -1,11 +1,11 @@
 [package]
-name = "whale"
+name = "bluewhale"
 version = "0.0.1"
 edition = "2024"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
-description = "`whale` is a (still very early) Rust SDK for the Docker Hub API v2"
-repository = "https://github.com/alvarobartt/whale"
+description = "`bluewhale` is a (still very early) Rust SDK for the Docker Hub API v2"
+repository = "https://github.com/alvarobartt/bluewhale"
 authors = ["Alvaro Bartolome <alvarobartt@gmail.com>"]
 
 [dependencies]

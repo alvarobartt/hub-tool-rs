@@ -1,14 +1,14 @@
-`whale` is a (still very early) Rust SDK for the Docker Hub API v2
+`bluewhale` is a (still very early) Rust SDK for the Docker Hub API v2
 
 At the moment only listing the repositories and the tags for a given org or username
 is supported, the API may be unstable and subject to breaking changes.
 
-Requirements are only `cargo add whale` and a Docker Hub Personal Access Token (PAT) to
+Requirements are only `cargo add bluewhale` and a Docker Hub Personal Access Token (PAT) to
 be generated from https://app.docker.com/settings/personal-access-tokens.
 
 ```rust
 use anyhow::Context;
-use whale::DockerHubClient;
+use bluewhale::DockerHubClient;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -27,3 +27,8 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 ```
+
+Note that the `bluewhale` name is tentative, most likely to be renamed to something
+like `docker-hub-sdk` or something more meaningful. P.S. It originally had the name
+`whale` but I was too slow and it was taken ~13 days before I published it, so the
+story is "ship faster" or "lock crate names in advance".
