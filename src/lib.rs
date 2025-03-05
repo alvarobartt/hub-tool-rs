@@ -195,6 +195,48 @@ mod tests {
         println!("{repository:#?}");
     }
 
+    #[test]
+    fn test_tag_serde() {
+        let value = json!({
+          "creator": 14304909,
+          "id": 529481097,
+          "images": [
+            {
+              "architecture": "amd64",
+              "features": "",
+              "variant": null,
+              "digest": "sha256:96b6a4e66250499a9d87a4adf259ced7cd213e2320fb475914217f4d69abe98d",
+              "os": "linux",
+              "os_features": "",
+              "os_version": null,
+              "size": 755930694,
+              "status": "active",
+              "last_pulled": "2025-03-05T07:52:00.613197154Z",
+              "last_pushed": "2024-01-16T20:54:52Z"
+            }
+          ],
+          "last_updated": "2024-01-16T20:54:55.914808Z",
+          "last_updater": 14304909,
+          "last_updater_username": "mxyng",
+          "name": "gguf",
+          "repository": 22180121,
+          "full_size": 755930694,
+          "v2": true,
+          "tag_status": "active",
+          "tag_last_pulled": "2025-03-05T07:52:00.613197154Z",
+          "tag_last_pushed": "2024-01-16T20:54:55.914808Z",
+          "media_type": "application/vnd.oci.image.index.v1+json",
+          "content_type": "image",
+          "digest": "sha256:7c49490a9e4a7ca4326e09c4b47bc525aa0a9dfc8ea0b3a30d62af23a60db712"
+        });
+
+        let tag = serde_json::from_value::<Tag>(value)
+            .context("failed to deserialize the tag payload")
+            .unwrap();
+
+        println!("{tag:#?}");
+    }
+
     #[tokio::test]
     async fn test_list_repositories() -> anyhow::Result<()> {
         let pat =
