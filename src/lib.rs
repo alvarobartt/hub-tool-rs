@@ -27,6 +27,21 @@ pub struct ApiResult<T> {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct Image {
+    architecture: String,
+    features: String,
+    variant: Option<String>,
+    digest: String,
+    os: Option<String>,
+    os_features: String,
+    os_version: Option<String>,
+    size: u64,
+    status: String,
+    last_pulled: DateTime<Utc>,
+    last_pushed: DateTime<Utc>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Tag {
     /// The Docker ID of the creator of the current tag
     creator: u64,
@@ -34,23 +49,7 @@ pub struct Tag {
     /// The ID of the current tag on the Docker Hub
     id: u64,
 
-    // TODO
-    //   "images": [
-    //     {
-    //       "architecture": "amd64",
-    //       "features": "",
-    //       "variant": null,
-    //       "digest": "sha256:96b6a4e66250499a9d87a4adf259ced7cd213e2320fb475914217f4d69abe98d",
-    //       "os": "linux",
-    //       "os_features": "",
-    //       "os_version": null,
-    //       "size": 755930694,
-    //       "status": "active",
-    //       "last_pulled": "2025-03-05T19:06:29.901114476Z",
-    //       "last_pushed": "2024-01-16T20:54:52Z"
-    //     },
-    //     ...
-    //  ]
+    images: Vec<Image>,
     last_updated: DateTime<Utc>,
     last_updater: u64,
     last_updater_username: String,
