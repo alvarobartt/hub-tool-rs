@@ -153,7 +153,7 @@ impl DockerHubClient {
     pub async fn list_repositories(&self, org: &str) -> anyhow::Result<Vec<Repository>> {
         let url = self
             .url
-            .join(&format!("v2/repositories/{}", org))
+            .join(&format!("v2/namespaces/{}/repositories", org)) // For some reason the endpoint `v2/repositories/{}` works seamlessly
             .context("failed formatting the url with the provided org")?;
 
         fetch::<Repository>(&self.client, &url)
@@ -169,7 +169,10 @@ impl DockerHubClient {
     pub async fn list_tags(&self, org: &str, repository: &str) -> anyhow::Result<Vec<Tag>> {
         let url = self
             .url
-            .join(&format!("v2/repositories/{}/{}/tags", org, repository))
+            .join(&format!(
+                "v2/namespaces/{}/repositories/{}/tags", // For some reason the endpoint `v2/repositories/{}/{}/tags` works seamlessly
+                org, repository
+            ))
             .context("failed formatting the url with the provided org and repository")?;
 
         fetch::<Tag>(&self.client, &url)
