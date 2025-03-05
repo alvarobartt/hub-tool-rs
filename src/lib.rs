@@ -1,5 +1,6 @@
 use anyhow::Context;
 use chrono::{DateTime, Utc};
+use futures::future::join_all;
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -18,9 +19,54 @@ pub struct DockerHubClient {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct ApiResult<T> {
+    count: usize,
+    next: Option<String>,
+    previous: Option<String>,
+    results: Vec<T>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Tag {
+    /// The Docker ID of the creator of the current tag
+    creator: u64,
+
+    /// The ID of the current tag on the Docker Hub
+    id: u64,
+
+    // TODO
+    //   "images": [
+    //     {
+    //       "architecture": "amd64",
+    //       "features": "",
+    //       "variant": null,
+    //       "digest": "sha256:96b6a4e66250499a9d87a4adf259ced7cd213e2320fb475914217f4d69abe98d",
+    //       "os": "linux",
+    //       "os_features": "",
+    //       "os_version": null,
+    //       "size": 755930694,
+    //       "status": "active",
+    //       "last_pulled": "2025-03-05T19:06:29.901114476Z",
+    //       "last_pushed": "2024-01-16T20:54:52Z"
+    //     },
+    //     ...
+    //  ]
+    last_updated: DateTime<Utc>,
+    last_updater: u64,
+    last_updater_username: String,
+
     /// The name of the tag for a given repository in the Docker Hub
     name: String,
+
+    repository: u64,
+    full_size: u64,
+    v2: bool,
+    tag_status: String,
+    tag_last_pulled: DateTime<Utc>,
+    tag_last_pushed: DateTime<Utc>,
+    media_type: String,
+    content_type: String,
+    digest: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -111,15 +157,9 @@ impl DockerHubClient {
             .join(&format!("v2/repositories/{}", org))
             .context("failed formatting the url with the provided org")?;
 
-        // TODO(alvarobartt): handle pagination
-        match self.client.get(url).send().await {
-            Ok(response) => match response.json::<Value>().await {
-                Ok(out) => Ok(serde_json::from_value(out["results"].clone())
-                    .context("parsing the output json into a `Repository` struct failed")?),
-                Err(e) => anyhow::bail!("failed with error {e}"),
-            },
-            Err(e) => anyhow::bail!("failed with error {e}"),
-        }
+        fetch::<Repository>(&self.client, &url)
+            .await
+            .context("fetching the provided url failed")
     }
 
     /// List all the tags for a given repository on the Docker Hub
@@ -133,15 +173,71 @@ impl DockerHubClient {
             .join(&format!("v2/repositories/{}/{}/tags", org, repository))
             .context("failed formatting the url with the provided org and repository")?;
 
-        // TODO(alvarobartt): handle pagination
-        match self.client.get(url).send().await {
-            Ok(response) => match response.json::<Value>().await {
-                Ok(out) => Ok(serde_json::from_value(out["results"].clone())
-                    .context("parsing the output json into a `Tag` struct failed")?),
-                Err(e) => anyhow::bail!("failed with error {e}"),
-            },
+        fetch::<Tag>(&self.client, &url)
+            .await
+            .context("fetching the provided url failed")
+    }
+}
+
+pub async fn fetch<T>(client: &Client, url: &Url) -> anyhow::Result<Vec<T>>
+where
+    T: for<'de> Deserialize<'de> + Send + 'static,
+{
+    let result = match client.get(url.clone()).send().await {
+        Ok(response) => match response.json::<Value>().await {
+            Ok(out) => serde_json::from_value::<ApiResult<T>>(out)
+                .context("parsing the output json into an `ApiResult<T>` struct failed")?,
             Err(e) => anyhow::bail!("failed with error {e}"),
+        },
+        Err(e) => anyhow::bail!("failed with error {e}"),
+    };
+
+    if let Some(_) = result.next {
+        let page_size = result.results.len();
+        let pages = (result.count + page_size - 1) / page_size;
+
+        // TODO: avoid spawning a bunch of tasks
+        let mut tasks = Vec::new();
+        for page in 2..pages {
+            let new_url = url.clone();
+            let new_client = client.clone();
+            tasks.push(tokio::spawn(async move {
+                match new_client
+                    .get(new_url)
+                    .query(&[("page", page), ("page_size", page_size)])
+                    .send()
+                    .await
+                {
+                    Ok(response) => match response.json::<Value>().await {
+                        Ok(out) => serde_json::from_value::<ApiResult<T>>(out).context(
+                            "parsing the output json into an `ApiResult<T>` struct failed",
+                        ),
+                        Err(e) => anyhow::bail!("failed with error {e}"),
+                    },
+                    Err(e) => anyhow::bail!("failed with error {e}"),
+                }
+            }));
         }
+
+        let mut results = result.results;
+
+        let futures = join_all(tasks).await;
+        for future in futures {
+            match future {
+                Ok(Ok(result)) => {
+                    results.extend(result.results);
+                }
+                Ok(Err(e)) => {
+                    anyhow::bail!("failed to fetch: {:?}", e);
+                }
+                Err(e) => {
+                    anyhow::bail!("failed capturing the task future: {:?}", e);
+                }
+            }
+        }
+        Ok(results)
+    } else {
+        Ok(result.results)
     }
 }
 
