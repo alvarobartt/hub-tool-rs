@@ -1,8 +1,9 @@
 # Docker Hub Tool
 
-> `hub-tool` is a (still very early) Rust SDK for the Docker Hub API v2.
+> `hub-tool` is a (very early) Rust SDK for the Docker Hub API v2.
 
-> [!WARNING] At the moment only listing the repositories and the tags for a
+> [!WARNING]
+> At the moment only listing the repositories and the tags for a
 > given org or username is supported, the SDK may be unstable and subject to breaking
 > changes.
 
