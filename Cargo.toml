@@ -1,11 +1,12 @@
 [package]
 name = "hub-tool"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2024"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
-description = "`hub-tool` is a (very early) SDK for the Docker Hub API v2"
+description = "A (very early) asynchronous Rust library for the Docker Hub API v2"
 repository = "https://github.com/alvarobartt/hub-tool-rs"
+documentation = "https://docs.rs/hub-tool"
 authors = ["Alvaro Bartolome <alvarobartt@gmail.com>"]
 
 [dependencies]

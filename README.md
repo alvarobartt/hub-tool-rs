@@ -1,6 +1,9 @@
-# Docker Hub Tool
+# hub-tool
 
-> `hub-tool` is a (very early) Rust SDK for the Docker Hub API v2.
+[![Crates.io](https://img.shields.io/crates/v/hub-tool.svg)](https://crates.io/crates/hub-tool)
+[![Documentation](https://docs.rs/hub-tool/badge.svg)](https://docs.rs/hub-tool)
+
+> A (very early) asynchronous Rust library for the Docker Hub API v2
 
 > [!WARNING]
 > At the moment only listing the repositories and the tags for a
@@ -32,7 +35,8 @@ use hub_tool::DockerHubClient;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let client = DockerHubClient::new("dckr_pat_***");
+    let client = DockerHubClient::new("dckr_pat_***")
+        .context("couldn't initialize the docker client")?;
 
     // Fetch the repositories under a given org or username on the Docker Hub
     let repositories = client.list_repositories("ollama")
@@ -40,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
         .context("failed while fetching the repositories")?;
 
     // Fetch the tags for a given repository on the Docker Hub
-    let tags = client.list_repositories("ollama", "quantize")
+    let tags = client.list_tags("ollama", "quantize")
         .await
         .context("failed while fetching the tags")?;
 

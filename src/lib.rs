@@ -1,10 +1,43 @@
+//! A (very early) asynchronous Rust library for the Docker Hub API v2
+//!
+//! This library exposes a client to interact with the Docker Hub via the Docker Hub API v2,
+//! enabling and making it easier to get information about repositories, tags, et al. from the
+//! Docker Hub via Rust; as well as to e.g. perform Hub maintenance tasks.
+//!
+//! ## Usage
+//!
+//! ```rust,no_run
+//! use anyhow::Context;
+//! use hub_tool::DockerHubClient;
+//!
+//! #[tokio::main]
+//! async fn main() -> anyhow::Result<()> {
+//!     let client = DockerHubClient::new("dckr_pat_***")
+//!         .context("couldn't initialize the docker client")?;
+//!
+//!     // Fetch the repositories under a given org or username on the Docker Hub
+//!     let repositories = client.list_repositories("ollama")
+//!         .await
+//!         .context("failed while fetching the repositories")?;
+//!
+//!     // Fetch the tags for a given repository on the Docker Hub
+//!     let tags = client.list_tags("ollama", "quantize")
+//!         .await
+//!         .context("failed while fetching the tags")?;
+//!
+//!     Ok(())
+//! }
+//! ```
+
 use anyhow::Context;
-use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use url::Url;
+
+pub mod repositories;
+pub mod tags;
 
 /// Struct that holds the client and the URL to send request to the Docker Hub
 pub struct DockerHubClient {
@@ -20,102 +53,20 @@ pub struct DockerHubClient {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ApiResult<T> {
+    /// Count of the total values that are available, not the `results` length
     count: usize,
+
+    /// The URL to query next if any, meaning that there are more results available to fetch;
+    /// note that it can be null meaning that all the results have already been fetched; otherwise
+    /// it contains the URL with the query values for `page` and `page_size`
     next: Option<String>,
+
+    /// The URL to query the previous listing of results; similar to `next` but the other way
+    /// around
     previous: Option<String>,
+
+    /// A vector with the query results based on the type T
     results: Vec<T>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Image {
-    architecture: String,
-    features: String,
-    variant: Option<String>,
-    digest: String,
-    os: Option<String>,
-    os_features: String,
-    os_version: Option<String>,
-    size: u64,
-    status: String,
-    last_pulled: DateTime<Utc>,
-    last_pushed: DateTime<Utc>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Tag {
-    /// The Docker ID of the creator of the current tag
-    creator: u64,
-
-    /// The ID of the current tag on the Docker Hub
-    id: u64,
-
-    images: Vec<Image>,
-    last_updated: DateTime<Utc>,
-    last_updater: u64,
-    last_updater_username: String,
-
-    /// The name of the tag for a given repository in the Docker Hub
-    name: String,
-
-    repository: u64,
-    full_size: u64,
-    v2: bool,
-    tag_status: String,
-    tag_last_pulled: DateTime<Utc>,
-    tag_last_pushed: DateTime<Utc>,
-    media_type: String,
-    content_type: String,
-    digest: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Category {
-    name: String,
-    slug: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Repository {
-    /// The name of the repository on the Docker Hub
-    pub name: String,
-
-    /// The namespace i.e. user or organization where the repository lives in
-    namespace: String,
-
-    /// The type of repository, can be any of "image", etc.
-    repository_type: String,
-
-    status: usize,
-
-    status_description: String,
-
-    // TODO: It cannot be None, but it can be empty which is practically the same, so let's handle
-    // this in the future to have some consistency and use None() over Some("")
-    description: String,
-
-    is_private: bool,
-
-    star_count: usize,
-
-    pull_count: usize,
-
-    last_updated: DateTime<Utc>,
-
-    last_modified: DateTime<Utc>,
-
-    date_registered: DateTime<Utc>,
-
-    // TODO: same as in `description`
-    affiliation: String,
-
-    media_types: Vec<String>,
-
-    content_types: Vec<String>,
-
-    categories: Vec<Category>,
-
-    /// The size of the virtual image in bytes
-    storage_size: u64,
 }
 
 impl DockerHubClient {
@@ -141,43 +92,6 @@ impl DockerHubClient {
             .context("couldn't build the reqwest client")?;
 
         Ok(Self { client, url })
-    }
-
-    /// List all the repositories under a given org or username on the Docker Hub
-    ///
-    /// This method lists all the repositories for a given organization or user via
-    /// the `org` argument that are uploaded and publicly available on the Docker Hub.
-    /// Note that if the repository is private but the provided token has access to it,
-    /// then the repositories will be listed, otherwise only the public ones (if any)
-    /// will be listed.
-    pub async fn list_repositories(&self, org: &str) -> anyhow::Result<Vec<Repository>> {
-        let url = self
-            .url
-            .join(&format!("v2/namespaces/{}/repositories", org)) // For some reason the endpoint `v2/repositories/{}` works seamlessly
-            .context("failed formatting the url with the provided org")?;
-
-        fetch::<Repository>(&self.client, &url)
-            .await
-            .context("fetching the provided url failed")
-    }
-
-    /// List all the tags for a given repository on the Docker Hub
-    ///
-    /// This method expects both the organization or username via the `org`
-    /// argument plus the `repository` name for the repository that the tags
-    /// will be listed for.
-    pub async fn list_tags(&self, org: &str, repository: &str) -> anyhow::Result<Vec<Tag>> {
-        let url = self
-            .url
-            .join(&format!(
-                "v2/namespaces/{}/repositories/{}/tags", // For some reason the endpoint `v2/repositories/{}/{}/tags` works seamlessly
-                org, repository
-            ))
-            .context("failed formatting the url with the provided org and repository")?;
-
-        fetch::<Tag>(&self.client, &url)
-            .await
-            .context("fetching the provided url failed")
     }
 }
 
@@ -240,122 +154,5 @@ where
         Ok(results)
     } else {
         Ok(result.results)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn test_repository_serde() {
-        let value = json!({
-          "name": "ollama",
-          "namespace": "ollama",
-          "repository_type": "image",
-          "status": 1,
-          "status_description": "active",
-          "description": "The easiest way to get up and running with large language models.",
-          "is_private": false,
-          "star_count": 1183,
-          "pull_count": 13256501,
-          "last_updated": "2025-03-04T04:01:22.754331Z",
-          "last_modified": "2024-10-16T13:48:34.145251Z",
-          "date_registered": "2023-06-29T23:27:34.326426Z",
-          "affiliation": "",
-          "media_types": [
-            "application/vnd.docker.container.image.v1+json",
-            "application/vnd.docker.distribution.manifest.list.v2+json",
-            "application/vnd.oci.image.config.v1+json",
-            "application/vnd.oci.image.index.v1+json"
-          ],
-          "content_types": [
-            "image"
-          ],
-          "categories": [
-            {
-              "name": "Machine Learning & AI",
-              "slug": "machine-learning-and-ai"
-            },
-            {
-              "name": "Developer Tools",
-              "slug": "developer-tools"
-            }
-          ],
-          "storage_size": 662988133055 as u64,
-        });
-
-        let repository = serde_json::from_value::<Repository>(value)
-            .context("failed to deserialize the repository payload")
-            .unwrap();
-
-        println!("{repository:#?}");
-    }
-
-    #[test]
-    fn test_tag_serde() {
-        let value = json!({
-          "creator": 14304909,
-          "id": 529481097,
-          "images": [
-            {
-              "architecture": "amd64",
-              "features": "",
-              "variant": null,
-              "digest": "sha256:96b6a4e66250499a9d87a4adf259ced7cd213e2320fb475914217f4d69abe98d",
-              "os": "linux",
-              "os_features": "",
-              "os_version": null,
-              "size": 755930694,
-              "status": "active",
-              "last_pulled": "2025-03-05T07:52:00.613197154Z",
-              "last_pushed": "2024-01-16T20:54:52Z"
-            }
-          ],
-          "last_updated": "2024-01-16T20:54:55.914808Z",
-          "last_updater": 14304909,
-          "last_updater_username": "mxyng",
-          "name": "gguf",
-          "repository": 22180121,
-          "full_size": 755930694,
-          "v2": true,
-          "tag_status": "active",
-          "tag_last_pulled": "2025-03-05T07:52:00.613197154Z",
-          "tag_last_pushed": "2024-01-16T20:54:55.914808Z",
-          "media_type": "application/vnd.oci.image.index.v1+json",
-          "content_type": "image",
-          "digest": "sha256:7c49490a9e4a7ca4326e09c4b47bc525aa0a9dfc8ea0b3a30d62af23a60db712"
-        });
-
-        let tag = serde_json::from_value::<Tag>(value)
-            .context("failed to deserialize the tag payload")
-            .unwrap();
-
-        println!("{tag:#?}");
-    }
-
-    #[tokio::test]
-    async fn test_list_repositories() -> anyhow::Result<()> {
-        let pat =
-            std::env::var("DOCKER_PAT").context("environment variable `DOCKER_PAT` is not set")?;
-        let dh =
-            DockerHubClient::new(&pat).context("the docker hub client couldn't be instantiated")?;
-
-        println!("{:#?}", dh.list_repositories("ollama").await);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_list_tags() -> anyhow::Result<()> {
-        let pat =
-            std::env::var("DOCKER_PAT").context("environment variable `DOCKER_PAT` is not set")?;
-        let dh =
-            DockerHubClient::new(&pat).context("the docker hub client couldn't be instantiated")?;
-
-        println!("{:#?}", dh.list_tags("ollama", "ollama").await);
-
-        Ok(())
     }
 }
