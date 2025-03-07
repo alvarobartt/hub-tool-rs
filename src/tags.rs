@@ -2,7 +2,7 @@ use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{fetch, DockerHubClient};
+use crate::{fetch_with_pagination, DockerHubClient};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Image {
@@ -61,7 +61,7 @@ impl DockerHubClient {
             ))
             .context("failed formatting the url with the provided org and repository")?;
 
-        fetch::<Tag>(&self.client, &url)
+        fetch_with_pagination::<Tag>(&self.client, &url)
             .await
             .context("fetching the provided url failed")
     }

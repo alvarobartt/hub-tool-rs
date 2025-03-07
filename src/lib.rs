@@ -95,18 +95,49 @@ impl DockerHubClient {
     }
 }
 
-pub async fn fetch<T>(client: &Client, url: &Url) -> anyhow::Result<Vec<T>>
+pub async fn fetch<T>(
+    client: &Client,
+    url: &Url,
+    page: Option<usize>,
+    page_size: Option<usize>,
+) -> anyhow::Result<ApiResult<T>>
 where
     T: for<'de> Deserialize<'de> + Send + 'static,
 {
-    let result = match client.get(url.clone()).send().await {
+    let page = if let Some(p) = page { p } else { 1 };
+    let page_size = if let Some(ps) = page_size { ps } else { 10 };
+
+    match client
+        .get(url.clone())
+        .query(&[("page", page), ("page_size", page_size)])
+        .send()
+        .await
+    {
         Ok(response) => match response.json::<Value>().await {
+            // The Docker Hub API is limited on the amount of requests you can perform per minute against it.
+            //
+            // If you haven't hit the limit, each request to the API will return the following headers in the response.
+            //
+            //     X-RateLimit-Limit - The limit of requests per minute.
+            //     X-RateLimit-Remaining - The remaining amount of calls within the limit period.
+            //     X-RateLimit-Reset - The unix timestamp of when the remaining resets.
+            //
+            // If you have hit the limit, you will receive a response status of 429 and the X-Retry-After header in the response.
+            //
+            // The X-Retry-After header is a unix timestamp of when you can call the API again.
             Ok(out) => serde_json::from_value::<ApiResult<T>>(out)
-                .context("parsing the output json into an `ApiResult<T>` struct failed")?,
+                .context("parsing the output json into an `ApiResult<T>` struct failed"),
             Err(e) => anyhow::bail!("failed with error {e}"),
         },
         Err(e) => anyhow::bail!("failed with error {e}"),
-    };
+    }
+}
+
+pub async fn fetch_with_pagination<T>(client: &Client, url: &Url) -> anyhow::Result<Vec<T>>
+where
+    T: for<'de> Deserialize<'de> + Send + 'static,
+{
+    let result = fetch(client, url, Some(1), Some(10)).await?;
 
     if let Some(_) = result.next {
         let page_size = result.results.len();
@@ -118,20 +149,7 @@ where
             let new_url = url.clone();
             let new_client = client.clone();
             tasks.push(tokio::spawn(async move {
-                match new_client
-                    .get(new_url)
-                    .query(&[("page", page), ("page_size", page_size)])
-                    .send()
-                    .await
-                {
-                    Ok(response) => match response.json::<Value>().await {
-                        Ok(out) => serde_json::from_value::<ApiResult<T>>(out).context(
-                            "parsing the output json into an `ApiResult<T>` struct failed",
-                        ),
-                        Err(e) => anyhow::bail!("failed with error {e}"),
-                    },
-                    Err(e) => anyhow::bail!("failed with error {e}"),
-                }
+                fetch(&new_client, &new_url, Some(page), Some(page_size)).await
             }));
         }
 

@@ -2,7 +2,7 @@ use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{fetch, DockerHubClient};
+use crate::{fetch_with_pagination, DockerHubClient};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Category {
@@ -68,7 +68,7 @@ impl DockerHubClient {
             .join(&format!("v2/namespaces/{}/repositories", org)) // For some reason the endpoint `v2/repositories/{}` works seamlessly
             .context("failed formatting the url with the provided org")?;
 
-        fetch::<Repository>(&self.client, &url)
+        fetch_with_pagination::<Repository>(&self.client, &url)
             .await
             .context("fetching the provided url failed")
     }
