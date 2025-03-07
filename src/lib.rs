@@ -113,22 +113,42 @@ where
         .send()
         .await
     {
-        Ok(response) => match response.json::<Value>().await {
-            // The Docker Hub API is limited on the amount of requests you can perform per minute against it.
-            //
-            // If you haven't hit the limit, each request to the API will return the following headers in the response.
-            //
-            //     X-RateLimit-Limit - The limit of requests per minute.
-            //     X-RateLimit-Remaining - The remaining amount of calls within the limit period.
-            //     X-RateLimit-Reset - The unix timestamp of when the remaining resets.
-            //
-            // If you have hit the limit, you will receive a response status of 429 and the X-Retry-After header in the response.
-            //
-            // The X-Retry-After header is a unix timestamp of when you can call the API again.
-            Ok(out) => serde_json::from_value::<ApiResult<T>>(out)
-                .context("parsing the output json into an `ApiResult<T>` struct failed"),
-            Err(e) => anyhow::bail!("failed with error {e}"),
-        },
+        Ok(response) => {
+            match response.status() {
+                // 429
+                reqwest::StatusCode::TOO_MANY_REQUESTS => {
+                    // The Docker Hub API is limited on the amount of requests you can perform per minute against it.
+                    // If you have hit the limit, you will receive a response status of 429 and the X-Retry-After header in the response.
+                    // The X-Retry-After header is a unix timestamp of when you can call the API again.
+                    if let Some(retry_after) = response.headers().get("X-Retry-After") {
+                        anyhow::bail!(
+                            "available requests exhausted, please try again after {}",
+                            retry_after.to_str().unwrap()
+                        )
+                    } else {
+                        anyhow::bail!("too many requests sent to the docker hub")
+                    }
+                }
+                // 404
+                reqwest::StatusCode::NOT_FOUND => {
+                    anyhow::bail!("{url} not found")
+                }
+                // 403
+                reqwest::StatusCode::UNAUTHORIZED => {
+                    anyhow::bail!("provided client is not authorized")
+                }
+                // 200 or 201
+                reqwest::StatusCode::OK | reqwest::StatusCode::CREATED => {
+                    match response.json::<Value>().await {
+                        Ok(out) => serde_json::from_value::<ApiResult<T>>(out).context(
+                            "parsing the output json into an `ApiResult<T>` struct failed",
+                        ),
+                        Err(e) => anyhow::bail!("failed with error {e}"),
+                    }
+                }
+                _ => anyhow::bail!("request failed with status code {}", response.status()),
+            }
+        }
         Err(e) => anyhow::bail!("failed with error {e}"),
     }
 }
