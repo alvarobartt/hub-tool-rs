@@ -100,19 +100,19 @@ pub async fn fetch<T>(
     url: &Url,
     page: Option<usize>,
     page_size: Option<usize>,
-) -> anyhow::Result<ApiResult<T>>
+) -> anyhow::Result<T>
 where
     T: for<'de> Deserialize<'de> + Send + 'static,
 {
-    let page = if let Some(p) = page { p } else { 1 };
-    let page_size = if let Some(ps) = page_size { ps } else { 10 };
+    let query = if let (Some(p), Some(ps)) = (page, page_size) {
+        client
+            .get(url.clone())
+            .query(&[("page", p), ("page_size", ps)])
+    } else {
+        client.get(url.clone())
+    };
 
-    match client
-        .get(url.clone())
-        .query(&[("page", page), ("page_size", page_size)])
-        .send()
-        .await
-    {
+    match query.send().await {
         Ok(response) => {
             match response.status() {
                 // 429
@@ -140,9 +140,8 @@ where
                 // 200 or 201
                 reqwest::StatusCode::OK | reqwest::StatusCode::CREATED => {
                     match response.json::<Value>().await {
-                        Ok(out) => serde_json::from_value::<ApiResult<T>>(out).context(
-                            "parsing the output json into an `ApiResult<T>` struct failed",
-                        ),
+                        Ok(out) => serde_json::from_value::<T>(out)
+                            .context("parsing the output json into an `T` struct failed"),
                         Err(e) => anyhow::bail!("failed with error {e}"),
                     }
                 }
@@ -157,7 +156,7 @@ pub async fn fetch_with_pagination<T>(client: &Client, url: &Url) -> anyhow::Res
 where
     T: for<'de> Deserialize<'de> + Send + 'static,
 {
-    let result = fetch(client, url, Some(1), Some(10)).await?;
+    let result = fetch::<ApiResult<T>>(client, url, Some(1), Some(10)).await?;
 
     if let Some(_) = result.next {
         let page_size = result.results.len();
@@ -169,7 +168,7 @@ where
             let new_url = url.clone();
             let new_client = client.clone();
             tasks.push(tokio::spawn(async move {
-                fetch(&new_client, &new_url, Some(page), Some(page_size)).await
+                fetch::<ApiResult<T>>(&new_client, &new_url, Some(page), Some(page_size)).await
             }));
         }
 
