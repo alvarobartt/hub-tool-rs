@@ -2,21 +2,30 @@ use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{fetch_with_pagination, DockerHubClient};
+use crate::{fetch, fetch_with_pagination, DockerHubClient};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Layer {
+    digest: Option<String>,
+    size: u64,
+    instruction: String,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Image {
-    architecture: String,
-    features: String,
+    architecture: String, // Not None, but can be "unknown" if not defined
+    features: String,     // Not None, but can be "" if not defined
     variant: Option<String>,
     digest: String,
-    os: Option<String>,
-    os_features: String,
+    layers: Option<Vec<Layer>>, // For some reason this shows within the API documentation but
+                                // it's not there so let's keep it until the report is scaled
+    os: Option<String>,  // Either None or "unknown"
+    os_features: String, // Not None, but can be "" if not defined
     os_version: Option<String>,
     size: u64,
     status: String,
-    last_pulled: DateTime<Utc>,
-    last_pushed: DateTime<Utc>,
+    last_pulled: Option<DateTime<Utc>>,
+    last_pushed: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -28,7 +37,7 @@ pub struct Tag {
     id: u64,
 
     images: Vec<Image>,
-    last_updated: DateTime<Utc>,
+    last_updated: Option<DateTime<Utc>>,
     last_updater: u64,
     last_updater_username: String,
 
@@ -39,8 +48,8 @@ pub struct Tag {
     full_size: u64,
     v2: bool,
     tag_status: String,
-    tag_last_pulled: DateTime<Utc>,
-    tag_last_pushed: DateTime<Utc>,
+    tag_last_pulled: Option<DateTime<Utc>>,
+    tag_last_pushed: Option<DateTime<Utc>>,
     media_type: String,
     content_type: String,
     digest: String,
@@ -62,6 +71,20 @@ impl DockerHubClient {
             .context("failed formatting the url with the provided org and repository")?;
 
         fetch_with_pagination::<Tag>(&self.client, &url)
+            .await
+            .context("fetching the provided url failed")
+    }
+
+    pub async fn read_tag(&self, org: &str, repository: &str, tag: &str) -> anyhow::Result<Tag> {
+        let url = self
+            .url
+            .join(&format!(
+                "v2/namespaces/{}/repositories/{}/tags/{}",
+                org, repository, tag
+            ))
+            .context("failed formatting the url with the provided org, repository, and tag")?;
+
+        fetch::<Tag>(&self.client, &url, None, None)
             .await
             .context("fetching the provided url failed")
     }
